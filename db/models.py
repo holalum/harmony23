@@ -21,6 +21,17 @@ class PaymentMethod(str, enum.Enum):
     yookassa = "yookassa"
     crypto = "crypto"
     telegram_stars = "telegram_stars"
+    balance = "balance"
+
+
+class BroadcastEvent(str, enum.Enum):
+    before_expiry = "before_expiry"
+    after_expiry = "after_expiry"
+
+
+class BroadcastUnit(str, enum.Enum):
+    days = "days"
+    hours = "hours"
 
 
 class OrderStatus(str, enum.Enum):
@@ -120,6 +131,33 @@ class TicketMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     ticket: Mapped["SupportTicket"] = relationship(back_populates="messages")
+
+
+class BroadcastRule(Base):
+    """Триггерная рассылка: 'за N дней/часов до истечения подписки' и т.п. См. Фазу 2 в README."""
+
+    __tablename__ = "broadcast_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_type: Mapped[BroadcastEvent] = mapped_column(Enum(BroadcastEvent))
+    value: Mapped[int] = mapped_column()
+    unit: Mapped[BroadcastUnit] = mapped_column(Enum(BroadcastUnit))
+    message_template: Mapped[str] = mapped_column(String(4096))
+    # nullable/пустая строка = таргет на все тарифы; иначе CSV id тарифов, например "1,3"
+    target_tariff_ids: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class BroadcastLog(Base):
+    """Защита от повторной отправки одного и того же правила одному пользователю."""
+
+    __tablename__ = "broadcast_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    rule_id: Mapped[int] = mapped_column(ForeignKey("broadcast_rules.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    sent_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Setting(Base):

@@ -105,5 +105,5 @@ async def _reward_referrer_revenue_share(session, referrer_id: int, order_amount
         return
 
     percent = float(await get_setting(session, "referral_revenue_share_percent", default="10"))
-    referrer.balance = (referrer.balance or 0) + float(order_amount) * percent / 100
+    referrer.balance = float(referrer.balance or 0) + float(order_amount) * percent / 100
     await session.commit()

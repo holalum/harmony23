@@ -22,6 +22,7 @@ class Settings:
     rub_per_star: float
 
     admin_chat_id: int | None
+    admin_ids: set[int]
 
     # какие inbounds/протоколы выдавать новым пользователям
     default_proxies: dict
@@ -30,6 +31,8 @@ class Settings:
 
 def load_settings() -> Settings:
     admin_chat_id_raw = os.environ.get("ADMIN_CHAT_ID")
+    admin_ids_raw = os.environ.get("ADMIN_IDS", "")
+    admin_ids = {int(v) for v in admin_ids_raw.split(",") if v.strip()}
     return Settings(
         bot_token=_require("BOT_TOKEN"),
         bot_username_url=os.environ.get("BOT_USERNAME_URL", "https://t.me/harmony_vpn_bot"),
@@ -42,6 +45,7 @@ def load_settings() -> Settings:
         cryptobot_api_token=os.environ.get("CRYPTOBOT_API_TOKEN") or None,
         rub_per_star=float(os.environ.get("RUB_PER_STAR", "2.0")),
         admin_chat_id=int(admin_chat_id_raw) if admin_chat_id_raw else None,
+        admin_ids=admin_ids,
         default_proxies=_load_json_env("DEFAULT_PROXIES", {"vless": {}}),
         default_inbounds=_load_json_env("DEFAULT_INBOUNDS", {"vless": ["VLESS TCP REALITY"]}),
     )

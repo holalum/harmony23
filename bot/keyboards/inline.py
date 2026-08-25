@@ -28,6 +28,7 @@ def payment_methods_keyboard(order_id: int, available: list[str]) -> InlineKeybo
         "yookassa": "💳 Банковская карта",
         "crypto": "🪙 Криптовалюта",
         "stars": "⭐ Telegram Stars",
+        "balance": "💰 Оплатить с баланса",
     }
     rows = [
         [InlineKeyboardButton(text=labels[m], callback_data=PayMethodCallback(order_id=order_id, method=m).pack())]

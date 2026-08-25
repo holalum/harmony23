@@ -59,6 +59,9 @@ async def on_tariff_selected(
         await session.refresh(order)
 
     available_methods = list(payment_registry.all().keys())
+    if user.balance and float(user.balance) >= float(tariff.price):
+        available_methods.append("balance")
+
     await callback.message.edit_text(
         f"Тариф: <b>{tariff.name}</b>\nСумма: <b>{tariff.price:.0f}₽</b>\n\nВыбери способ оплаты:",
         reply_markup=payment_methods_keyboard(order.id, available_methods),

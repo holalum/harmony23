@@ -8,7 +8,8 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.config import load_settings
-from bot.handlers import payment, start, tariffs
+from bot.handlers import broadcast_admin, payment, referral, start, support, tariffs
+from bot.services.broadcasts import broadcast_loop
 from db.session import create_all_tables, init_db
 from marzban_client.client import MarzbanClient
 from payments.registry import build_registry
@@ -39,6 +40,12 @@ async def main():
     dp.include_router(start.router)
     dp.include_router(tariffs.router)
     dp.include_router(payment.router)
+    dp.include_router(referral.router)
+    dp.include_router(broadcast_admin.router)
+    # support.router — последним: содержит catch-all на обычные текстовые сообщения
+    dp.include_router(support.router)
+
+    broadcast_task = asyncio.create_task(broadcast_loop(bot, marzban))
 
     try:
         await dp.start_polling(
@@ -47,8 +54,12 @@ async def main():
             payment_registry=payment_registry,
             default_proxies=settings.default_proxies,
             default_inbounds=settings.default_inbounds,
+            admin_ids=settings.admin_ids,
+            admin_chat_id=settings.admin_chat_id,
+            bot_username_url=settings.bot_username_url,
         )
     finally:
+        broadcast_task.cancel()
         await marzban.close()
 
 

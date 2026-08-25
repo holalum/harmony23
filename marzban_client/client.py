@@ -161,6 +161,27 @@ class MarzbanClient:
         resp = await self._request("GET", f"/api/user/{username}")
         return self._parse_user(resp.json())
 
+    async def list_users(self, status: Optional[str] = "active", page_size: int = 200) -> list[MarzbanUser]:
+        """
+        Возвращает всех пользователей Marzban (постранично).
+        Используется фоновыми задачами (умные рассылки, детект аномалий),
+        которым нужно пройтись по всем активным доступам разом.
+        """
+        users: list[MarzbanUser] = []
+        offset = 0
+        while True:
+            params: dict[str, Any] = {"offset": offset, "limit": page_size}
+            if status is not None:
+                params["status"] = status
+            resp = await self._request("GET", "/api/users", params=params)
+            data = resp.json()
+            page = data.get("users", [])
+            users.extend(self._parse_user(u) for u in page)
+            if len(page) < page_size:
+                break
+            offset += page_size
+        return users
+
     async def modify_user(self, username: str, **fields) -> MarzbanUser:
         """Частичное изменение пользователя (например продление: expire=...)."""
         resp = await self._request("PUT", f"/api/user/{username}", json=fields)

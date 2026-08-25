@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
-
-from aiogram import Bot, Router
+from aiogram import Router
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -14,7 +12,7 @@ from aiogram.types import (
 
 from bot.keyboards.inline import PayMethodCallback
 from bot.services.delivery import deliver_order
-from db.models import Order, OrderStatus, PaymentMethod, Tariff
+from db.models import Order, OrderStatus, PaymentMethod, Tariff, User
 from db.session import get_session
 from marzban_client.client import MarzbanClient
 from payments.base import PaymentStatus
@@ -27,6 +25,7 @@ _METHOD_ENUM = {
     "yookassa": PaymentMethod.yookassa,
     "crypto": PaymentMethod.crypto,
     "stars": PaymentMethod.telegram_stars,
+    "balance": PaymentMethod.balance,
 }
 
 
@@ -35,6 +34,7 @@ async def on_payment_method_selected(
     callback: CallbackQuery,
     callback_data: PayMethodCallback,
     payment_registry: PaymentRegistry,
+    marzban: MarzbanClient,
     default_proxies: dict,
     default_inbounds: dict,
 ):
@@ -47,6 +47,22 @@ async def on_payment_method_selected(
         tariff = await session.get(Tariff, order.tariff_id)
         order.payment_method = _METHOD_ENUM[callback_data.method]
         await session.commit()
+
+    # --- Оплата с внутреннего баланса (реферальные начисления revenue_share) ---
+    if callback_data.method == "balance":
+        async with get_session() as session:
+            order = await session.get(Order, callback_data.order_id)
+            user = await session.get(User, order.user_id)
+            if float(user.balance or 0) < float(order.amount):
+                await callback.answer("Недостаточно средств на балансе", show_alert=True)
+                return
+            user.balance = float(user.balance) - float(order.amount)
+            order.external_payment_id = "balance"
+            await session.commit()
+
+        await deliver_order(order.id, callback.bot, marzban, default_proxies, default_inbounds)
+        await callback.answer("Готово! Проверь личные сообщения 🎉")
+        return
 
     provider = payment_registry.get(callback_data.method)
 
