@@ -28,6 +28,41 @@ Harmony — сервис продажи VPN-подписок (VLESS Reality) ч�
 
 ---
 
+## Quick Start
+
+### Вариант 1 — Docker Compose (рекомендуется)
+
+Поднимает бот + Postgres. Marzban должен быть развёрнут отдельно заранее
+(см. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — полный чек-лист с нуля).
+
+```bash
+cp .env.example .env
+nano .env   # заполни BOT_TOKEN, MARZBAN_URL и т.д. — см. docs/CONFIGURATION.md
+docker compose up -d --build
+docker compose exec bot python seed_tariffs.py
+```
+
+Готово — пиши `/start` боту в Telegram.
+
+### Вариант 2 — вручную (для разработки)
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env
+nano .env   # DATABASE_URL можно оставить sqlite для локальной разработки
+
+python seed_tariffs.py
+python -m bot.main
+```
+
+Подробности по каждой переменной `.env` — [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+Полный чек-лист деплоя на чистый VPS — [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+---
+
 ## Фаза 0 — репозиторий и деплой (сделать первой)
 
 - `git init`, `.gitignore` (venv, __pycache__, .env, *.db, *.pyc), первый коммит,
