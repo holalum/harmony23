@@ -5,8 +5,9 @@ from datetime import datetime
 from aiogram import Bot
 from sqlalchemy import select
 
-from db.models import Order, OrderStatus, Tariff, User
+from db.models import Order, OrderStatus, ReferralMode, Tariff, User
 from db.session import get_session
+from db.settings import get_setting
 from marzban_client.client import MarzbanClient
 
 
@@ -45,9 +46,11 @@ async def deliver_order(order_id: int, bot: Bot, marzban: MarzbanClient, default
         order.paid_at = datetime.utcnow()
         await session.commit()
 
-        # Реферальный бонус — начисляем пригласившему при первой оплате
+        # Реферальный бонус — начисляем пригласившему по правилам активного режима рефералки
         if user.referred_by_id and order.id == await _first_paid_order_id(session, user.id):
-            await _reward_referrer(session, user.referred_by_id, tariff, order.amount)
+            await _reward_referrer(session, user.referred_by_id, tariff, order.amount, marzban)
+        elif user.referred_by_id:
+            await _reward_referrer_revenue_share(session, user.referred_by_id, order.amount)
 
     await bot.send_message(
         user.telegram_id,
@@ -67,14 +70,40 @@ async def _first_paid_order_id(session, user_id: int) -> int | None:
     return result.scalar_one_or_none()
 
 
-async def _reward_referrer(session, referrer_id: int, tariff: Tariff, order_amount) -> None:
+async def _reward_referrer(session, referrer_id: int, tariff: Tariff, order_amount, marzban: MarzbanClient) -> None:
     """
-    Простая классическая рефералка: пригласивший получает столько же дней,
-    сколько купил его реферал. Revenue-share режим — TODO, когда определитесь
-    с процентом в бизнес-настройках.
+    Начисление пригласившему при ПЕРВОЙ оплате приглашённого.
+
+    Режим `days` (глобальная настройка referral_mode): и пригласивший, и приглашённый
+    получают N дней (referral_bonus_days). Режим `revenue_share` обрабатывается отдельно
+    в _reward_referrer_revenue_share() при каждой оплате, включая первую.
     """
     referrer = await session.get(User, referrer_id)
     if referrer is None:
         return
-    # Начисление дней рефереру реализуется через тот же marzban.extend_user()
-    # в вызывающем коде — здесь оставлен как заготовка для Фазы 2.
+
+    mode = await get_setting(session, "referral_mode", default=ReferralMode.off.value)
+    if mode == ReferralMode.days.value:
+        bonus_days = int(await get_setting(session, "referral_bonus_days", default="7"))
+        referrer_username = referrer.marzban_username or f"tg_{referrer.telegram_id}"
+        try:
+            await marzban.extend_user(referrer_username, extra_days=bonus_days)
+        except Exception:
+            pass  # у пригласившего ещё нет доступа в Marzban — начислим при следующей его оплате
+    elif mode == ReferralMode.revenue_share.value:
+        await _reward_referrer_revenue_share(session, referrer_id, order_amount)
+
+
+async def _reward_referrer_revenue_share(session, referrer_id: int, order_amount) -> None:
+    """Режим revenue_share: пригласившему на баланс зачисляется % от суммы заказа (при каждой оплате)."""
+    mode = await get_setting(session, "referral_mode", default=ReferralMode.off.value)
+    if mode != ReferralMode.revenue_share.value:
+        return
+
+    referrer = await session.get(User, referrer_id)
+    if referrer is None:
+        return
+
+    percent = float(await get_setting(session, "referral_revenue_share_percent", default="10"))
+    referrer.balance = (referrer.balance or 0) + float(order_amount) * percent / 100
+    await session.commit()

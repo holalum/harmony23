@@ -1,0 +1,33 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Оверрайдим DATABASE_URL из .env, чтобы бот всегда стучался в контейнер db,
+      # даже если в .env для локальной разработки прописан sqlite.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-harmony}:${POSTGRES_PASSWORD:-harmony}@db:5432/${POSTGRES_DB:-harmony}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Marzban НЕ входит в этот compose — это отдельный сервис (ставится по
+    # инструкции Gozargah/Marzban), Harmony обращается к нему по MARZBAN_URL из .env.
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-harmony}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-harmony}
+      POSTGRES_DB: ${POSTGRES_DB:-harmony}
+    volumes:
+      - harmony_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-harmony}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  harmony_db_data:

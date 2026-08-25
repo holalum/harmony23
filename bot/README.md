@@ -10,44 +10,10 @@
 - Способы оплаты: ЮKassa, CryptoBot, Telegram Stars (каждый можно включить/выключить
   через .env — просто не заполняй соответствующие переменные)
 
-## Что ещё предстоит (Фаза 2+, см. наш roadmap)
+## Что ещё предстоит (Фаза 2+, см. roadmap в корневом README.md)
 - `/my` — статус подписки, оставшийся трафик
-- Реферальные начисления (сейчас только фиксируется факт реферала, начисление —
-  заготовка в `bot/services/delivery.py`)
 - Тикеты поддержки, умные рассылки, детект аномального трафика — модели в
   `db/models.py` уже есть, хендлеров пока нет
-
-## Запуск
-
-1. Установи зависимости:
-   ```
-   pip install -r requirements.txt
-   ```
-2. Разверни Marzban (если ещё не развёрнут) — https://github.com/Gozargah/Marzban
-3. Скопируй `.env.example` в `.env` и заполни:
-   - `BOT_TOKEN` — токен от @BotFather
-   - `MARZBAN_URL`, `MARZBAN_ADMIN_USERNAME`, `MARZBAN_ADMIN_PASSWORD` — доступ к твоей Marzban-панели
-   - способы оплаты — заполни только те, что нужны
-4. Загрузи переменные окружения (например через `python-dotenv` или `export $(cat .env | xargs)`)
-5. Создай стартовые тарифы:
-   ```
-   python seed_tariffs.py
-   ```
-6. Запусти бота:
-   ```
-   python -m bot.main
-   ```
-
-## Структура проекта
-```
-bot/                — Telegram-бот (aiogram)
-  handlers/          — /start, выбор тарифа, оплата
-  keyboards/          — inline-клавиатуры
-  services/delivery.py — общая логика выдачи VPN-доступа после оплаты
-marzban_client/       — клиент для Marzban REST API
-payments/             — провайдеры оплаты (ЮKassa, CryptoBot, Stars) за одним интерфейсом
-db/                    — модели (SQLAlchemy) и сессия БД
-```
 
 ## Важно
 - Marzban распространяется под AGPL-3.0 — если дорабатываешь его исходники
@@ -56,3 +22,6 @@ db/                    — модели (SQLAlchemy) и сессия БД
   Marzban не касается, если ты не редактируешь сам Marzban.
 - Способ проверки оплаты для ЮKassa/CryptoBot сейчас — кнопка "Я оплатил"
   (ручной поллинг). Для продакшена лучше добавить вебхуки — это в Фазе 2.
+
+Инструкции по запуску (Docker Compose и вручную) — в корневом [README.md](../README.md),
+чек-лист деплоя — в [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).

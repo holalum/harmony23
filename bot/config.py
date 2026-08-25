@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 
@@ -20,12 +21,15 @@ class Settings:
     cryptobot_api_token: str | None
     rub_per_star: float
 
+    admin_chat_id: int | None
+
     # какие inbounds/протоколы выдавать новым пользователям
     default_proxies: dict
     default_inbounds: dict
 
 
 def load_settings() -> Settings:
+    admin_chat_id_raw = os.environ.get("ADMIN_CHAT_ID")
     return Settings(
         bot_token=_require("BOT_TOKEN"),
         bot_username_url=os.environ.get("BOT_USERNAME_URL", "https://t.me/harmony_vpn_bot"),
@@ -33,12 +37,13 @@ def load_settings() -> Settings:
         marzban_admin_username=_require("MARZBAN_ADMIN_USERNAME"),
         marzban_admin_password=_require("MARZBAN_ADMIN_PASSWORD"),
         database_url=os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./harmony.db"),
-        yookassa_shop_id=os.environ.get("YOOKASSA_SHOP_ID"),
-        yookassa_secret_key=os.environ.get("YOOKASSA_SECRET_KEY"),
-        cryptobot_api_token=os.environ.get("CRYPTOBOT_API_TOKEN"),
+        yookassa_shop_id=os.environ.get("YOOKASSA_SHOP_ID") or None,
+        yookassa_secret_key=os.environ.get("YOOKASSA_SECRET_KEY") or None,
+        cryptobot_api_token=os.environ.get("CRYPTOBOT_API_TOKEN") or None,
         rub_per_star=float(os.environ.get("RUB_PER_STAR", "2.0")),
-        default_proxies={"vless": {}},
-        default_inbounds={"vless": ["VLESS TCP REALITY"]},
+        admin_chat_id=int(admin_chat_id_raw) if admin_chat_id_raw else None,
+        default_proxies=_load_json_env("DEFAULT_PROXIES", {"vless": {}}),
+        default_inbounds=_load_json_env("DEFAULT_INBOUNDS", {"vless": ["VLESS TCP REALITY"]}),
     )
 
 
@@ -47,3 +52,18 @@ def _require(key: str) -> str:
     if not value:
         raise RuntimeError(f"Не задана переменная окружения {key} (см. .env.example)")
     return value
+
+
+def _load_json_env(key: str, default: dict) -> dict:
+    """
+    DEFAULT_PROXIES/DEFAULT_INBOUNDS раньше были захардкожены в коде — теперь
+    настраиваются через .env (см. docs/CONFIGURATION.md), чтобы менять набор
+    протоколов/inbound'ов без правки кода бота.
+    """
+    raw = os.environ.get(key)
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Переменная {key} должна быть валидным JSON: {exc}") from exc

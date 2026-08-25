@@ -1,0 +1,16 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+.venv
+venv
+env
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite3
+docs
+README.md
+bot/README.md
+TASK_BRIEF.md
